@@ -1,5 +1,5 @@
 // 勾配メーター：電波が弱い場所でも開けるように、前回のファイルを保存しておく
-const CACHE = 'koubai-v1.4';
+const CACHE = 'koubai-v1.5';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -18,7 +18,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request, { cache: 'no-store' }).then(res => {
+    fetch(e.request.url, { cache: 'no-cache' }).then(res => {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy));
       return res;
