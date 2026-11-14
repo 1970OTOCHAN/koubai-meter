@@ -45,6 +45,13 @@ button:focus-visible{outline:3px solid var(--up);outline-offset:3px}
 .legal{max-width:36em;color:var(--dim);font-size:12px;line-height:1.6;text-align:left;border-top:1px solid #2a2f37;padding-top:12px}
 .legal p{margin:0 0 6px;font-size:12px}
 .legal .cr{text-align:center;margin:8px 0 0}
+.warn{max-width:36em;width:100%;text-align:left;border:2px solid var(--up);border-radius:12px;padding:12px 14px;background:#1d1206}
+.warn h2{margin:0 0 6px;font-size:17px;color:var(--up)}
+.warn ul{margin:0;padding-left:1.3em;font-size:14px;line-height:1.6}
+.warn li+li{margin-top:4px}
+.howto{max-width:36em;width:100%;text-align:left;font-size:14px;line-height:1.6}
+.howto h2{margin:0 0 4px;font-size:15px}
+.cover .agree{font-size:12px;color:#ccc;text-align:center}
 .hide{display:none!important}
 @media (orientation:landscape){
   .app{display:grid;grid-template-columns:minmax(0,1fr) clamp(150px,22vw,230px);grid-template-rows:auto minmax(0,1fr) auto auto;grid-template-areas:"top top" "main btns" "msg btns" "foot foot";column-gap:16px;padding:8px max(14px,env(safe-area-inset-right)) 6px max(14px,env(safe-area-inset-left))}
@@ -66,7 +73,7 @@ button:focus-visible{outline:3px solid var(--up);outline-offset:3px}
 </head>
 <body>
 <div class="app">
-  <div class="top"><span>勾配メーター Ver 1.6</span><span id="st">停止中</span></div>
+  <div class="top"><span>勾配メーター Ver 1.7</span><span id="st">停止中</span></div>
   <div class="main">
     <div style="text-align:center">
       <div class="lab" id="lab">平坦</div>
@@ -105,14 +112,24 @@ button:focus-visible{outline:3px solid var(--up);outline-offset:3px}
 
 <div class="cover" id="cover">
   <h1>勾配メーター</h1>
-  <ol>
-    <li>バイクを平らな場所に停める</li>
-    <li>スマホをホルダーに取り付ける</li>
-    <li>「スタート」→「水平リセット」を押す</li>
-  </ol>
-  <p>スマホの傾きから坂の勾配（％）を表示します。加速・ブレーキ中や段差では数値がずれます。</p>
-  <button id="go">スタート</button>
-  <p class="msg" id="err"></p>
+  <div class="warn">
+    <h2>必ずお読みください</h2>
+    <ul>
+      <li><b>走行中は、このアプリを操作したり、画面を見続けたりしないでください。</b>操作は必ず安全な場所に停車してから行ってください。</li>
+      <li>スマホは、走行中に落ちないようホルダーにしっかり固定してください。</li>
+      <li>表示される勾配は<b>目安</b>です。道路標識の代わりにはなりません。</li>
+      <li>勾配はスマホの傾きから計算します。加速・ブレーキ中、カーブ、段差では数値がずれます。</li>
+      <li>スマホの取り付け角度を変えたときは、もう一度「水平リセット」を押してください。</li>
+    </ul>
+  </div>
+  <div class="howto">
+    <h2>使い方</h2>
+    <ol>
+      <li>バイクを平らな場所に停める</li>
+      <li>スマホをホルダーに取り付ける</li>
+      <li>「同意してスタート」→「水平リセット」を押す</li>
+    </ol>
+  </div>
   <div class="legal">
     <p>本アプリは無料で提供しており、表示の正確さ・動作を保証するものではありません。</p>
     <p>本アプリの使用または使用できなかったことにより生じた事故・損害・トラブル等について、作者は一切の責任を負いません。</p>
@@ -120,6 +137,9 @@ button:focus-visible{outline:3px solid var(--up);outline-offset:3px}
     <p>アプリそのものの無断での再配布・改変・販売はご遠慮ください。スクリーンショットやリンクでの紹介は自由です。</p>
     <p class="cr">© 2026 1970 OTOCHAN</p>
   </div>
+  <p class="agree">「同意してスタート」を押すと、上記の内容に同意したものとします。</p>
+  <button id="go">同意してスタート</button>
+  <p class="msg" id="err"></p>
 </div>
 
 <script>
