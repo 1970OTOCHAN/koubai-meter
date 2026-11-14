@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0d0f12">
+<title>勾配メーター</title>
+<style>
+/* VOICE: バイクのメーターのように、一瞬で読める
+   IDEA: 坂道標識（勾配％）
+   PICTURE: 大きな数字と、傾く道の絵
+   COLOUR: 黒地、上り=オレンジ、下り=水色、平坦=白
+   TYPE/LAYOUT: 数字は画面いっぱい、ボタンは下に大きく */
+:root{--bg:#0d0f12;--ink:#f2f4f7;--dim:#8a93a0;--up:#ff8a1f;--down:#38b6ff;--flat:#f2f4f7;--c:var(--flat)}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+.app{height:100%;display:flex;flex-direction:column;padding:12px 14px calc(12px + env(safe-area-inset-bottom))}
+.top{display:flex;justify-content:space-between;align-items:center;color:var(--dim);font-size:14px}
+.main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.lab{font-size:clamp(28px,8vw,56px);font-weight:800;color:var(--c);letter-spacing:.05em}
+.num{font-size:clamp(96px,34vw,260px);font-weight:900;line-height:1;color:var(--c);font-variant-numeric:tabular-nums;white-space:nowrap}
+.num small{font-size:.35em;font-weight:800;margin-left:.05em}
+.deg{color:var(--dim);font-size:18px;font-variant-numeric:tabular-nums}
+svg.road{width:min(70vw,320px);height:auto;margin-top:6px}
+.btns{display:flex;gap:10px}
+button{flex:1;min-height:64px;border:0;border-radius:14px;font:inherit;font-size:20px;font-weight:800;color:#0d0f12;background:var(--ink);cursor:pointer}
+button.sub{flex:0 0 auto;padding:0 16px;font-size:15px;background:#2a2f37;color:var(--ink)}
+button:focus-visible{outline:3px solid var(--up);outline-offset:3px}
+.msg{min-height:1.5em;text-align:center;color:var(--dim);font-size:14px;margin:8px 0}
+.foot{text-align:center;color:#5d6570;font-size:11px;line-height:1.4}
+.cover{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center}
+.cover h1{margin:0;font-size:36px}
+.cover p{margin:0;color:var(--dim);max-width:34em}
+.cover ol{text-align:left;margin:0;padding-left:1.4em;max-width:30em}
+.cover button{flex:none;width:min(80vw,320px)}
+.hide{display:none!important}
+@media (orientation:landscape){.main{flex-direction:row;gap:24px}.num{font-size:clamp(80px,22vw,220px)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top"><span>勾配メーター Ver 1.0</span><span id="st">停止中</span></div>
+  <div class="main">
+    <div style="text-align:center">
+      <div class="lab" id="lab">平坦</div>
+      <div class="num"><span id="num">0</span><small>%</small></div>
+      <div class="deg" id="deg">0.0°</div>
+    </div>
+    <svg class="road" viewBox="0 0 200 110" aria-hidden="true">
+      <g id="slope" style="transform-origin:100px 60px">
+        <rect x="10" y="58" width="180" height="10" rx="3" fill="var(--c)"/>
+        <rect x="88" y="44" width="24" height="12" rx="3" fill="var(--dim)"/>
+        <circle cx="90" cy="56" r="5" fill="var(--dim)"/><circle cx="110" cy="56" r="5" fill="var(--dim)"/>
+      </g>
+    </svg>
+  </div>
+  <div class="msg" id="msg">平らな場所で「水平リセット」を押してください</div>
+  <div class="btns">
+    <button id="zero">水平リセット</button>
+    <button class="sub" id="rev">上下反転</button>
+  </div>
+  <div class="foot">走行中の操作・注視はしないでください。数値は目安です。<br>アプリそのものの無断での再配布・改変・販売はご遠慮ください。スクリーンショットやリンクでの紹介は自由です。<br>© 2026 1970 OTOCHAN</div>
+</div>
+
+<div class="cover" id="cover">
+  <h1>勾配メーター</h1>
+  <ol>
+    <li>バイクを平らな場所に停める</li>
+    <li>スマホをホルダーに取り付ける</li>
+    <li>「スタート」→「水平リセット」を押す</li>
+  </ol>
+  <p>スマホの傾きから坂の勾配（％）を表示します。加速・ブレーキ中や段差では数値がずれます。</p>
+  <button id="go">スタート</button>
+  <p class="msg" id="err"></p>
+</div>
+
+<script>
+{
+const $=id=>document.getElementById(id);
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+let fu=null,fz=null,last=0;           // なめらかにした重力の値
+let zero=parseFloat(store.get('kb_zero'));
+if(isNaN(zero)) zero=null;
+let rev=store.get('kb_rev')==='1';
+let cal=null;                          // 水平リセット中のデータ
+let wake=null,running=false;
+
+function orient(){
+  const a=(screen.orientation&&screen.orientation.angle!=null)?screen.orientation.angle:(window.orientation||0);
+  return ((a%360)+360)%360;
+}
+function onMotion(e){
+  const g=e.accelerationIncludingGravity; if(!g||g.x==null) return;
+  const o=orient();
+  const u=o===90?g.x:o===270?-g.x:o===180?-g.y:g.y;   // 画面の「上」方向
+  const z=g.z;
+  const now=performance.now(), dt=last?Math.min((now-last)/1000,0.2):0.02; last=now;
+  const k=1-Math.exp(-dt/0.6);
+  if(fu===null){fu=u;fz=z}else{fu+=k*(u-fu);fz+=k*(z-fz)}
+  if(cal){cal.u+=u;cal.z+=z;cal.n++}
+}
+function phi(){return Math.atan2(fz,fu)}
+function wrap(a){while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;return a}
+
+function draw(){
+  if(fu===null){$('st').textContent=running?'センサー待ち…':'停止中';return}
+  $('st').textContent='計測中';
+  if(zero===null){$('lab').textContent='未設定';$('num').textContent='--';$('deg').textContent='';return}
+  let a=-wrap(phi()-zero); if(rev)a=-a;
+  const pct=Math.tan(a)*100, d=a*180/Math.PI;
+  const r=Math.round(pct);
+  let lab='平坦',c='var(--flat)';
+  if(r>=1){lab='上り';c='var(--up)'}else if(r<=-1){lab='下り';c='var(--down)'}
+  document.documentElement.style.setProperty('--c',c);
+  $('lab').textContent=lab;
+  $('num').textContent=(r>0?'+':'')+(Math.abs(r)>99?'99':r);
+  $('deg').textContent=(d>0?'+':'')+d.toFixed(1)+'°';
+  const show=Math.max(-30,Math.min(30,d*2));     // 絵は見やすく2倍に傾ける
+  $('slope').style.transform='rotate('+(-show)+'deg)';
+}
+
+function doZero(){
+  if(fu===null){$('msg').textContent='センサーの値がまだ届いていません';return}
+  cal={u:0,z:0,n:0};
+  $('msg').textContent='水平を測っています…スマホに触らないでください';
+  $('zero').disabled=true;
+  setTimeout(()=>{
+    const c=cal; cal=null; $('zero').disabled=false;
+    if(!c||c.n<5){$('msg').textContent='うまく測れませんでした。もう一度押してください';return}
+    zero=Math.atan2(c.z/c.n,c.u/c.n);
+    store.set('kb_zero',String(zero));
+    $('msg').textContent='水平を設定しました（0%）';
+  },1500);
+}
+
+async function lock(){
+  try{ if('wakeLock' in navigator){wake=await navigator.wakeLock.request('screen')} }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(running&&document.visibilityState==='visible')lock()});
+
+async function start(){
+  try{
+    if(typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission==='function'){
+      const p=await DeviceMotionEvent.requestPermission();
+      if(p!=='granted'){$('err').textContent='センサーの使用が許可されませんでした';return}
+    }
+  }catch(e){$('err').textContent='センサーの許可を確認できませんでした';return}
+  window.addEventListener('devicemotion',onMotion);
+  running=true; lock();
+  $('cover').classList.add('hide');
+  if(zero!==null)$('msg').textContent='前回の水平設定を使っています';
+  setTimeout(()=>{if(fu===null)$('msg').textContent='センサーが動きません。ChromeかSafariで直接開いてください'},3000);
+}
+
+$('go').addEventListener('click',start);
+$('zero').addEventListener('click',doZero);
+$('rev').addEventListener('click',()=>{rev=!rev;store.set('kb_rev',rev?'1':'0');$('msg').textContent=rev?'上り・下りを反転しました':'上り・下りを元に戻しました'});
+setInterval(draw,150);
+}
+</script>
+</body>
+</html>
