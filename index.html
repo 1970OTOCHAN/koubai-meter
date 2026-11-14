@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0d0f12">
 <title>勾配メーター</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 /* VOICE: バイクのメーターのように、一瞬で読める
    IDEA: 坂道標識（勾配％）
@@ -45,7 +48,7 @@ button:focus-visible{outline:3px solid var(--up);outline-offset:3px}
 </head>
 <body>
 <div class="app">
-  <div class="top"><span>勾配メーター Ver 1.1</span><span id="st">停止中</span></div>
+  <div class="top"><span>勾配メーター Ver 1.2</span><span id="st">停止中</span></div>
   <div class="main">
     <div style="text-align:center">
       <div class="lab" id="lab">平坦</div>
@@ -176,6 +179,7 @@ $('go').addEventListener('click',start);
 $('zero').addEventListener('click',doZero);
 $('rev').addEventListener('click',()=>{rev=!rev;store.set('kb_rev',rev?'1':'0');$('msg').textContent=rev?'上り・下りを反転しました':'上り・下りを元に戻しました'});
 setInterval(draw,150);
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 }
 </script>
 </body>
