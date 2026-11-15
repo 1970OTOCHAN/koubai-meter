@@ -73,7 +73,7 @@ button:focus-visible{outline:3px solid var(--up);outline-offset:3px}
 </head>
 <body>
 <div class="app">
-  <div class="top"><span>勾配メーター Ver 1.8</span><span id="st">停止中</span></div>
+  <div class="top"><span>勾配メーター Ver 1.9</span><span id="st">停止中</span></div>
   <div class="main">
     <div style="text-align:center">
       <div class="lab" id="lab">平坦</div>
@@ -148,10 +148,10 @@ const $=id=>document.getElementById(id);
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 let fu=null,fz=null,last=0;           // なめらかにした重力の値
 /* 数字のちらつきを抑える仕組み（Ver 1.8、Moto Meter Samlet と同じ）
-   ①なめらかにする時間 1.5秒
+   ①なめらかにする時間 1.0秒
    ②加速・ブレーキ中（前後の強い揺れ）は計算を止め、揺れ始める少し前の値のまま数字を止める
-   ③表示の数字は、今の表示との違いが約2%以上で1秒、約1%で3秒続いたときだけ切り替える */
-const SMOOTH=1.5,SHAKE_ON=1.2;
+   ③表示の数字は、今の表示との違いが約2%以上で0.5秒、約1%で1.5秒続いたときだけ切り替える */
+const SMOOTH=1.0,SHAKE_ON=1.2;
 let sx=0,sy=0,sz=0,shakeUntil=0,freezeFrom=0,frozen=false,shown=null,pendT=0,hist=[],pSum=0,pN=0;
 // 水平の設定は、画面の向き（縦・横）ごとに別々に記憶する
 {const old=store.get('kb_zero'); if(old!==null&&store.get('kb_zero_0')===null) store.set('kb_zero_0',old);}
@@ -204,7 +204,7 @@ function settle(p){
   if(!pendT){pendT=now;pSum=0;pN=0}
   pSum+=p; pN++;
   const avg=pSum/pN, diff=Math.abs(avg-shown);
-  if(now-pendT>=(diff>=1.8?1000:3000)&&Math.round(avg)!==shown){shown=Math.round(avg);pendT=0;pSum=0;pN=0}
+  if(now-pendT>=(diff>=1.8?500:1500)&&Math.round(avg)!==shown){shown=Math.round(avg);pendT=0;pSum=0;pN=0}
   return shown;
 }
 function draw(){
