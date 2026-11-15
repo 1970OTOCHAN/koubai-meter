@@ -1,5 +1,5 @@
 // 勾配メーター：電波が弱い場所でも開けるように、前回のファイルを保存しておく
-const CACHE = 'koubai-v1.9';
+const CACHE = 'koubai-v2.0';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

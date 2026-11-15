@@ -73,7 +73,7 @@ button:focus-visible{outline:3px solid var(--up);outline-offset:3px}
 </head>
 <body>
 <div class="app">
-  <div class="top"><span>勾配メーター Ver 1.9</span><span id="st">停止中</span></div>
+  <div class="top"><span>勾配メーター Ver 2.0</span><span id="st">停止中</span></div>
   <div class="main">
     <div style="text-align:center">
       <div class="lab" id="lab">平坦</div>
@@ -264,12 +264,19 @@ $('zero').addEventListener('click',doZero);
 $('rev').addEventListener('click',()=>{rev=!rev;shown=null;store.set('kb_rev',rev?'1':'0');$('msg').textContent=rev?'上り・下りを反転しました':'上り・下りを元に戻しました'});
 setInterval(draw,150);
 // 開くたびに最新版を確認し、新しい版が届いたら自動で入れ替える
+try{const s=sessionStorage.getItem('kb_scroll'); if(s!==null){sessionStorage.removeItem('kb_scroll'); requestAnimationFrame(()=>{$('cover').scrollTop=+s})}}catch(e){}
 if('serviceWorker' in navigator){
   const had=!!navigator.serviceWorker.controller; let done=false;
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')r.update().catch(()=>{})});
   }).catch(()=>{});
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!done){done=true;location.reload()}});
+  /* 新しい版に切り替わったとき：計測中は読み込み直さない（次に開いたときに新しい版になる）。
+     オープニング中は、読んでいた位置を覚えてから読み込み直し、同じ位置に戻す（Ver 2.0） */
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(!had||done||running)return; done=true;
+    try{sessionStorage.setItem('kb_scroll',String($('cover').scrollTop))}catch(e){}
+    location.reload();
+  });
 }
 }
 </script>
