@@ -1,5 +1,5 @@
 // 勾配メーター：電波が弱い場所でも開けるように、前回のファイルを保存しておく
-const CACHE = 'koubai-v2.0';
+const CACHE = 'koubai-v2.1';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -17,6 +17,7 @@ self.addEventListener('activate', e => {
 // 開くたびに必ずネットから最新を取り（スマホに残った古いページは使わない）、つながらないときは保存したものを使う
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  if (new URL(e.request.url).origin !== location.origin) return; // ほかのサイト（アクセス数の計測など）は保存しない
   e.respondWith(
     fetch(e.request.url, { cache: 'no-cache' }).then(res => {
       const copy = res.clone();
