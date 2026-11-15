@@ -73,7 +73,7 @@ button:focus-visible{outline:3px solid var(--up);outline-offset:3px}
 </head>
 <body>
 <div class="app">
-  <div class="top"><span>勾配メーター Ver 1.7</span><span id="st">停止中</span></div>
+  <div class="top"><span>勾配メーター Ver 1.8</span><span id="st">停止中</span></div>
   <div class="main">
     <div style="text-align:center">
       <div class="lab" id="lab">平坦</div>
@@ -147,13 +147,19 @@ button:focus-visible{outline:3px solid var(--up);outline-offset:3px}
 const $=id=>document.getElementById(id);
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 let fu=null,fz=null,last=0;           // なめらかにした重力の値
+/* 数字のちらつきを抑える仕組み（Ver 1.8、Moto Meter Samlet と同じ）
+   ①なめらかにする時間 1.5秒
+   ②加速・ブレーキ中（前後の強い揺れ）は計算を止め、揺れ始める少し前の値のまま数字を止める
+   ③表示の数字は、今の表示との違いが約2%以上で1秒、約1%で3秒続いたときだけ切り替える */
+const SMOOTH=1.5,SHAKE_ON=1.2;
+let sx=0,sy=0,sz=0,shakeUntil=0,freezeFrom=0,frozen=false,shown=null,pendT=0,hist=[],pSum=0,pN=0;
 // 水平の設定は、画面の向き（縦・横）ごとに別々に記憶する
 {const old=store.get('kb_zero'); if(old!==null&&store.get('kb_zero_0')===null) store.set('kb_zero_0',old);}
 let curO=null,zero=null;
 function loadZero(){
   const o=orient(); if(o===curO) return; curO=o;
   const z=parseFloat(store.get('kb_zero_'+o)); zero=isNaN(z)?null:z;
-  fu=null; fz=null;
+  fu=null; fz=null; shown=null; hist=[];
   if(running) $('msg').textContent=zero===null?'この向きの「水平リセット」を押してください':'この向きの水平設定を使っています';
 }
 let rev=store.get('kb_rev')==='1';
@@ -170,20 +176,46 @@ function onMotion(e){
   const u=o===90?g.x:o===270?-g.x:o===180?-g.y:g.y;   // 画面の「上」方向
   const z=g.z;
   const now=performance.now(), dt=last?Math.min((now-last)/1000,0.2):0.02; last=now;
-  const k=1-Math.exp(-dt/0.6);
-  if(fu===null){fu=u;fz=z}else{fu+=k*(u-fu);fz+=k*(z-fz)}
   if(cal){cal.u+=u;cal.z+=z;cal.n++}
+  /* 加速・ブレーキの検出：重力を除いた揺れを0.15秒でならす（細かい振動は打ち消し合う） */
+  const la=e.acceleration, ks=1-Math.exp(-dt/0.15);
+  if(la&&la.x!=null){sx+=ks*(la.x-sx);sy+=ks*(la.y-sy);sz+=ks*(la.z-sz)}
+  else{sx+=ks*(g.x-sx);sy+=ks*(g.y-sy);sz+=ks*(g.z-sz)}
+  const mag=(la&&la.x!=null)?Math.hypot(sx,sy,sz):Math.abs(Math.hypot(sx,sy,sz)-9.81);
+  if(mag>SHAKE_ON) shakeUntil=now+800;
+  const was=frozen;
+  frozen=fu!==null&&now<shakeUntil;
+  if(frozen){if(!freezeFrom)freezeFrom=now; if(now-freezeFrom>5000)frozen=false}else freezeFrom=0;
+  if(frozen){
+    if(!was){const old=hist.find(s=>s.t>=now-600); if(old){fu=old.fu;fz=old.fz}}
+    return;
+  }
+  const k=1-Math.exp(-dt/SMOOTH);
+  if(fu===null){fu=u;fz=z}else{fu+=k*(u-fu);fz+=k*(z-fz)}
+  hist.push({t:now,fu,fz}); while(hist.length&&hist[0].t<now-1200) hist.shift();
 }
 function phi(){return Math.atan2(fz,fu)}
 function wrap(a){while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;return a}
 
+function settle(p){
+  const now=performance.now();
+  if(shown===null){shown=Math.round(p);pendT=0;return shown}
+  if(Math.abs(p-shown)<0.8){pendT=0;pSum=0;pN=0;return shown}
+  if(!pendT){pendT=now;pSum=0;pN=0}
+  pSum+=p; pN++;
+  const avg=pSum/pN, diff=Math.abs(avg-shown);
+  if(now-pendT>=(diff>=1.8?1000:3000)&&Math.round(avg)!==shown){shown=Math.round(avg);pendT=0;pSum=0;pN=0}
+  return shown;
+}
 function draw(){
   if(fu===null){$('st').textContent=running?'センサー待ち…':'停止中';return}
-  $('st').textContent='計測中';
+  $('st').textContent=frozen?'加速・減速中は停止':'計測中';
   if(zero===null){$('lab').textContent='未設定';$('num').textContent='--';$('deg').textContent='';return}
   let a=-wrap(phi()-zero); if(rev)a=-a;
-  const pct=Math.tan(a)*100, d=a*180/Math.PI;
-  const r=Math.round(pct);
+  const pct=Math.tan(a)*100;
+  const r=frozen?(shown===null?Math.round(pct):shown):settle(pct);
+  if(frozen) pendT=0;
+  const d=Math.atan(r/100)*180/Math.PI;          // 表示している％に合わせた角度
   let lab='平坦',c='var(--flat)';
   if(r>=1){lab='上り';c='var(--up)'}else if(r<=-1){lab='下り';c='var(--down)'}
   document.documentElement.style.setProperty('--c',c);
@@ -202,7 +234,7 @@ function doZero(){
   setTimeout(()=>{
     const c=cal; cal=null; $('zero').disabled=false;
     if(!c||c.n<5){$('msg').textContent='うまく測れませんでした。もう一度押してください';return}
-    zero=Math.atan2(c.z/c.n,c.u/c.n);
+    zero=Math.atan2(c.z/c.n,c.u/c.n); shown=null;
     store.set('kb_zero_'+curO,String(zero));
     $('msg').textContent='水平を設定しました（0%）';
   },1500);
@@ -229,7 +261,7 @@ async function start(){
 
 $('go').addEventListener('click',start);
 $('zero').addEventListener('click',doZero);
-$('rev').addEventListener('click',()=>{rev=!rev;store.set('kb_rev',rev?'1':'0');$('msg').textContent=rev?'上り・下りを反転しました':'上り・下りを元に戻しました'});
+$('rev').addEventListener('click',()=>{rev=!rev;shown=null;store.set('kb_rev',rev?'1':'0');$('msg').textContent=rev?'上り・下りを反転しました':'上り・下りを元に戻しました'});
 setInterval(draw,150);
 // 開くたびに最新版を確認し、新しい版が届いたら自動で入れ替える
 if('serviceWorker' in navigator){
